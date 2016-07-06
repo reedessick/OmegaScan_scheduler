@@ -11,6 +11,7 @@ import json
 
 import dataFind
 import fork
+import commands
 
 import time
 from lal.gpstime import tconvert
@@ -31,6 +32,7 @@ parser.add_option('-V', '--Verbose', default=False, action='store_true')
 parser.add_option('-g', '--graceid', default=None, type='string', help='if supplied, generate scans for this event. Otherwise, we look in stdin for an alert.')
 
 parser.add_option('-s', '--skip-upload', default=False, action='store_true', help='do not upload pointers to GraceDB')
+parser.add_option('-r', '--robot-cert', default=False, action='store_true', help='set up robot certificate')
 
 opts, args = parser.parse_args()
 
@@ -38,7 +40,7 @@ if len(args) != 1:
     raise ValueError('please supply exactly one config file as an argument\n%s'%usage)
 config_name = args[0]
 
-opts.Verbose = opts.Verbose or opts.verbose
+opts.verbose = opts.Verbose or opts.verbose
 opts.upload  = not opts.skip_upload ### do this once so we don't repeat it over and over
 
 upload_or_verbose = opts.upload or opts.verbose
@@ -59,7 +61,20 @@ executable  = config.get('general', 'executable')
 chansets = config.get('general', 'chansets').split()
 chansets.sort(key=lambda chanset: config.getfloat(chanset, 'win')) ### extract windows for each chanset and order them accordingly
 
-persist = config.getbool('general', 'persist') and upload_or_verbose ### we only persist if we will report something
+persist = config.getboolean('general', 'persist') and upload_or_verbose ### we only persist if we will report something
+
+farThr  = config.getfloat('general', 'farThr') ### threshold on FAR for which events we follow-up
+
+#-------------------------------------------------
+
+### set up robot cert
+if opts.robot_cert:
+    if os.environ.has_key("X509_USER_PROXY"):
+        del os.environ['X509_USER_PROXY']
+
+    ### get cert and key from ini file
+    os.environ['X509_USER_CERT'] = config.get('ldg_certificate', 'robot_certificate')
+    os.environ['X509_USER_KEY']  = config.get('ldg_certificate', 'robot_key')
 
 #-------------------------------------------------
 
@@ -68,14 +83,25 @@ if opts.graceid==None:
     if opts.Verbose:
         print "reading lvalert message from stdin"
     alert = sys.stdin.read()
+
     if opts.Verbose:
         print "    %s"%(alert)
     alert = json.loads(alert)
+
+    if alert['alert_type'] != 'new': ### ignore alerts that aren't new
+        if opts.Verbose:
+            print "ignoring alert"
+        sys.exit(0)
+
+    if farThr < alert['far']:
+        if opts.Verbose:
+            print "ignoring alert due to high FAR (%.3e > %.3e)"%(alert['far'], farThr)
+
     opts.graceid = alert['uid']
 
 ### extract things about the event
-gdb = GraceDb(gracedb_url)
-gps = json.loads(gdb.event(opts.graceid).read())['gpstime']
+gdb = GraceDb( gracedb_url )
+gps = gdb.event( opts.graceid ).json()['gpstime']
 
 if opts.verbose:
     print "generating OmegaScans for : %s\n    gps : %.6f"%(opts.graceid, gps)
@@ -95,7 +121,7 @@ if upload_or_verbose:
 
 ### iterate through chansets, processing each one separately
 if persist:
-    proc = []
+    procs = []
 
 for chanset in chansets:
 
@@ -105,7 +131,7 @@ for chanset in chansets:
     exeConfig  = config.get(chanset, 'config')
 
     if opts.verbose:
-        print "processing %s\n    ifo        : %s\n    frame_type : %s\n    config      : %s"%(chanset, ifo, frame_type, exeConfig)
+        print "processing %s\n    ifo        : %s\n    frame_type : %s\n    config     : %s"%(chanset, ifo, frame_type, exeConfig)
 
     ### set up output directory
     this_outdir = os.path.join(outdir, opts.graceid, chanset.replace(" ",""))
@@ -115,7 +141,7 @@ for chanset in chansets:
     if os.path.exists(this_outdir):
         raise ValueError( "directory=%s already exists!"%(this_outdir) )
     else:
-        os.path.makedirs( this_outdir )
+        os.makedirs( this_outdir )
 
     ### figure out when to processes
     win    = config.getfloat(chanset, 'win')
@@ -128,27 +154,33 @@ for chanset in chansets:
     timeout = end + config.getfloat(chanset, 'timeout') ### add timeout to the end time
 
     ### wait until we have a chance of finding data (causality)
-    wait = end - tconvert(now)
+    wait = end - tconvert('now')
     if wait > 0:
         if opts.verbose:
             print "  waiting %.3f sec"%(wait)
         time.sleep( wait )
 
-    frames = []
-    coverage = 0
     if opts.verbose:
         print "  finding frames"
     if lookup == 'ldr': ### find with LDR servers
-        ldr_server   = config.get(chanset, 'ldr_server')
-        ldr_url_type = config.get(chanset, 'ldr_url_type')
-        while (coverage < 1) and (tconvert(now)<timeout):
-            frames = dataFind.ldr_find_frames( ldr_server, ldr_url_type, frame_type, ifo, start, stride, verbose=opts.Verbose )
+        if config.has_option(chanset, 'ldr-server'):
+            ldr_server = config.get(chanset, 'ldr-server')
+        else:
+            ldr_server = None
+        ldr_url_type = config.get(chanset, 'ldr-url-type')
+
+        frames   = dataFind.ldr_find_frames( ldr_server, ldr_url_type, frame_type, ifo, start, stride, verbose=opts.Verbose )
+        coverage = dataFind.coverage(frames, start, stride)
+        while (coverage < 1) and (tconvert('now')<timeout):
+            frames   = dataFind.ldr_find_frames( ldr_server, ldr_url_type, frame_type, ifo, start, stride, verbose=opts.Verbose )
             coverage = dataFind.coverage(frames, start, stride)
 
     elif lookup == 'shm': ### find directly from shared memory directory
-        shm_dir = config.get(chanset, 'shm_dir')
-        while (coverage < 1) and (tconvert(now)<timeout):
-            frames = dataFind.shm_find_frames( shm_dir, ifo, frame_type, start, stride, verbose=opts.Verbose )
+        shm_dir  = config.get(chanset, 'shm_dir')
+        frames   = dataFind.shm_find_frames( shm_dir, ifo, frame_type, start, stride, verbose=opts.Verbose )
+        coverage = dataFind.coverage(frames, start, stride)
+        while (coverage < 1) and (tconvert('now')<timeout):
+            frames   = dataFind.shm_find_frames( shm_dir, ifo, frame_type, start, stride, verbose=opts.Verbose )
             coverage = dataFind.coverage(frames, start, stride)
 
     else:
@@ -162,27 +194,26 @@ for chanset in chansets:
         print "  copying frames into local directory"
     newframes = ["%s/%s"%(this_outdir, os.path.basename(frame)) for frame in frames]
     for frame, newframe in zip(frames, newframes):
-        sp.Popen(['cp', frame, newframe]).wait()
+        if opts.Verbose:
+            print "    %s -> %s"%(frame, newframe)
+        fork.fork(['cp', frame, newframe]).wait() ### delegates to subprocess.Popen
 
     ### define execution command
-    cmd, stdout, stderr = commands.omegaScanCommand( executable, exeConfig, this_outdir, this_outdir )
+    cmd, stdout, stderr = commands.omegaScanCommand( executable, gps, exeConfig, this_outdir, this_outdir )
     if opts.verbose:
         print "%s 1> %s 2> %s"%(" ".join(cmd), stdout, stderr)
 
+    print "\nWARNING: output_url location is not correctly set! grab this from config file? from commands.py in some intelligent, automated way?\n"
     output_url = "FIXME: output_url"
 
     ### submit execution command
     if persist: ### submit directly through subprocess and track proc
-        stdout_obj = open(stdout, 'w')
-        stderr_obj = open(stderr, 'w')
-        proc = sp.Popen(cmd, stdout=stdout_obj, stderr=stderr_obj)
-        stdout_obj.close()
-        stderr_obj.close() 
+        proc = fork.fork( cmd, stdout=stdout, stderr=stderr )
         procs.append( (chanset, start, end, proc) )
 
         ### report link to GraceDB for this chanset
         ### because persist is True, we know that upload_or_verbose must also be True
-        message = "OmegaScan process over %s within [%.3f, %.3f] started. Output can be found <a href=\"%s\">here</a>."%(chanset, start, end, link, output_url)
+        message = "OmegaScan process over %s within [%.3f, %.3f] started. Output can be found <a href=\"%s\">here</a>."%(chanset, start, end, output_url)
         if opts.verbose:
             print message
         if opts.verbose:
@@ -200,6 +231,9 @@ for chanset in chansets:
                 gdb.writeLog( opts.graceid, message=message, tagname=['data_quality'] )
 
 if persist: ### wait around for all the processes to finish
+    if opts.verbose:
+        print "waiting for processes to finish"
+
     while len(procs):
         chanset, start, end, proc = procs.pop(0) ### get the first proc
         returncode = proc.poll()
