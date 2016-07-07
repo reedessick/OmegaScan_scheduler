@@ -56,6 +56,7 @@ config.read( config_name )
 ### pull out general info
 gracedb_url = config.get('general', 'gracedb-url')
 outdir      = config.get('general', 'outdir')
+outurl      = config.get('general', 'outurl')
 executable  = config.get('general', 'executable')
 
 ### figure out which chansets to process and in what order
@@ -145,10 +146,11 @@ for chanset in chansets:
     if opts.verbose:
         print "processing %s\n    ifo        : %s\n    frame_type : %s\n    config     : %s"%(chanset, ifo, frame_type, exeConfig)
 
-    ### set up output directory
+    ### set up output directory and url
     this_outdir = os.path.join(outdir, opts.graceid, chanset.replace(" ",""))
+    this_outurl = os.path.join(outurl, opts.graceid, chanset.replace(" ",""))
     if opts.verbose:    
-        print "  writing into : %s"%(this_outdir)
+        print "  writing into : %s -> %s"%(this_outdir, this_outurl)
 
     if os.path.exists(this_outdir):
         raise ValueError( "directory=%s already exists!"%(this_outdir) )
@@ -236,15 +238,6 @@ for chanset in chansets:
             print "    %s -> %s"%(frame, newframe)
         fork.fork(['cp', frame, newframe]).wait() ### delegates to subprocess.Popen
 
-    #-----------------------------------------------------------------------------------------------
-    #
-    #
-    print "\nWARNING: output_url location is not correctly set! grab this from config file? from commands.py in some intelligent, automated way?\n"
-    output_url = "FIXME: output_url"
-    #
-    #
-    #-----------------------------------------------------------------------------------------------
-
     ### submit execution command
     if condor: ### run under condor
         ### define execution command
@@ -263,7 +256,7 @@ for chanset in chansets:
 
         ### report link to GraceDB for this chanset
         if opts.verbose or opts.upload:
-            message = "OmegaScan process over %s within [%.3f, %.3f] started. Output can be found <a href=\"%s\">here</a>. WARNING: submitting through condor and will not track processes to ensure completion"%(chanset, start, end, output_url)
+            message = "OmegaScan process over %s within [%.3f, %.3f] started. Output can be found <a href=\"%s\">here</a>. WARNING: submitting through condor and will not track processes to ensure completion"%(chanset, start, end, this_outurl)
             if opts.verbose:
                 print message
             if opts.upload:
@@ -285,7 +278,7 @@ for chanset in chansets:
 
             ### report link to GraceDB for this chanset
             ### because persist is True, we know that upload_or_verbose must also be True
-            message = "OmegaScan process over %s within [%.3f, %.3f] started. Output can be found <a href=\"%s\">here</a>."%(chanset, start, end, output_url)
+            message = "OmegaScan process over %s within [%.3f, %.3f] started. Output can be found <a href=\"%s\">here</a>."%(chanset, start, end, this_outurl)
             if opts.verbose:
                 print message
             if opts.verbose:
@@ -296,7 +289,7 @@ for chanset in chansets:
 
             ### report link to GraceDB for this chanset
             if opts.verbose or opts.upload:
-                message = "OmegaScan process over %s within [%.3f, %.3f] started. Output can be found <a href=\"%s\">here</a>. WARNING: will not track processes to ensure completion"%(chanset, start, end, output_url)
+                message = "OmegaScan process over %s within [%.3f, %.3f] started. Output can be found <a href=\"%s\">here</a>. WARNING: will not track processes to ensure completion"%(chanset, start, end, this_outurl)
                 if opts.verbose:
                     print message
                 if opts.upload:
