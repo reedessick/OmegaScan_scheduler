@@ -11,3 +11,4 @@ We may also want to provide functionality to generate OmegaScan config files ``o
 TODO:
  - implement ``on the fly'' functionality through a separate executable. Will need to automate writing OmegaScan config files, too.
  - implement job submission to condor. This should be straightforward to implement under commands.py with existing infrastructure, but automating the dag and sub writting deserves some thought.
+ - need to automatically determine the correct url for links in GraceDB. Currently, we post a dummy link but we need to direct people to the correct url automatically.
