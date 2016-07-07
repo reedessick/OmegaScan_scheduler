@@ -16,7 +16,7 @@ import commands
 import time
 from lal.gpstime import tconvert
 
-from ligo.gracedb.rest import GraceDb
+#from ligo.gracedb.rest import GraceDb
 
 from ConfigParser import SafeConfigParser
 
@@ -61,7 +61,17 @@ executable  = config.get('general', 'executable')
 chansets = config.get('general', 'chansets').split()
 chansets.sort(key=lambda chanset: config.getfloat(chanset, 'win')) ### extract windows for each chanset and order them accordingly
 
-persist = config.getboolean('general', 'persist') and upload_or_verbose ### we only persist if we will report something
+### whether to use condor
+condor  = config.getboolean('general', 'condor')
+if condor:
+    universe              = config.get('condor', 'universe')
+    accounting_group      = config.get('condor', 'accounting_group')
+    accounting_group_user = config.get('condor', 'accounting_group_user')
+
+### whether to stick around after forking processes
+persist = config.getboolean('general', 'persist') \
+            and upload_or_verbose \
+            and (not condor)      ### a only persist if we will report somethin gnd we aren't submitting through condor
 
 farThr  = config.getfloat('general', 'farThr') ### threshold on FAR for which events we follow-up
 
@@ -203,32 +213,69 @@ for chanset in chansets:
     if opts.verbose:
         print "%s 1> %s 2> %s"%(" ".join(cmd), stdout, stderr)
 
+    #-----------------------------------------------------------------------------------------------
+    #
+    #
     print "\nWARNING: output_url location is not correctly set! grab this from config file? from commands.py in some intelligent, automated way?\n"
     output_url = "FIXME: output_url"
+    #
+    #
+    #-----------------------------------------------------------------------------------------------
 
     ### submit execution command
-    if persist: ### submit directly through subprocess and track proc
-        proc = fork.fork( cmd, stdout=stdout, stderr=stderr )
-        procs.append( (chanset, start, end, proc) )
-
-        ### report link to GraceDB for this chanset
-        ### because persist is True, we know that upload_or_verbose must also be True
-        message = "OmegaScan process over %s within [%.3f, %.3f] started. Output can be found <a href=\"%s\">here</a>."%(chanset, start, end, output_url)
+    if condor: ### run under condor
+        cmd, stdout, stderr = commands.condorOmegaScanCommand( executable,
+                                                               gps, 
+                                                               exeConfig, 
+                                                               this_outdir, 
+                                                               this_outdir, 
+                                                               accounting_group, 
+                                                               accounting_group_user,
+                                                               universe=universe
+                                                             )
         if opts.verbose:
-            print message
-        if opts.verbose:
-            gdb.writeLog( opts.graceid, message=message, tagname=['data_quality'] )
-
-    else: ### (double) fork and forget about proc
+            print "%s 1> %s 2> %s"%(" ".join(cmd), stdout, stderr)
         fork.safe_fork( cmd, stdout=stdout, stderr=stderr)
 
         ### report link to GraceDB for this chanset
         if opts.verbose or opts.upload:
-            message = "OmegaScan process over %s within [%.3f, %.3f] started. Output can be found <a href=\"%s\">here</a>. WARNING: will not track processes to ensure completion"%(chanset, start, end, output_url)
+            message = "OmegaScan process over %s within [%.3f, %.3f] started. Output can be found <a href=\"%s\">here</a>. WARNING: submitting through condor and will not track processes to ensure completion"%(chanset, start, end, output_url)
             if opts.verbose:
                 print message
             if opts.upload:
                 gdb.writeLog( opts.graceid, message=message, tagname=['data_quality'] )
+
+    else: ### run on the head node
+        cmd, stdout, stderr = commands.omegaScanCommand( executable, 
+                                                         gps, 
+                                                         exeConfig, 
+                                                         this_outdir, 
+                                                         this_outdir 
+                                                       )
+        if opts.verbose:
+            print "%s 1> %s 2> %s"%(" ".join(cmd), stdout, stderr)
+        if persist: ### submit directly through subprocess and track proc
+            proc = fork.fork( cmd, stdout=stdout, stderr=stderr )
+            procs.append( (chanset, start, end, proc) )
+
+            ### report link to GraceDB for this chanset
+            ### because persist is True, we know that upload_or_verbose must also be True
+            message = "OmegaScan process over %s within [%.3f, %.3f] started. Output can be found <a href=\"%s\">here</a>."%(chanset, start, end, output_url)
+            if opts.verbose:
+                print message
+            if opts.verbose:
+                gdb.writeLog( opts.graceid, message=message, tagname=['data_quality'] )
+
+        else: ### (double) fork and forget about proc
+            fork.safe_fork( cmd, stdout=stdout, stderr=stderr)
+
+            ### report link to GraceDB for this chanset
+            if opts.verbose or opts.upload:
+                message = "OmegaScan process over %s within [%.3f, %.3f] started. Output can be found <a href=\"%s\">here</a>. WARNING: will not track processes to ensure completion"%(chanset, start, end, output_url)
+                if opts.verbose:
+                    print message
+                if opts.upload:
+                    gdb.writeLog( opts.graceid, message=message, tagname=['data_quality'] )
 
 if persist: ### wait around for all the processes to finish
     if opts.verbose:
@@ -255,7 +302,9 @@ if persist: ### wait around for all the processes to finish
             
 ### report to GraceDB that we've finished follow-up
 if upload_or_verbose:
-    message = "automatic OmegaScans finished"
+    message = "automatic OmegaScans finished."
+    if condor or (not persist):
+        message = message + " WARNING: not tracking actual OmegaScan processes and data may not be available immediately."
     if opts.verbose:
         print message
     if opts.upload:
