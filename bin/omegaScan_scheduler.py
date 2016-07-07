@@ -250,6 +250,8 @@ if persist: ### wait around for all the processes to finish
                 print message
             if opts.upload:
                 gdb.writeLog( opts.graceid, message=message, tagname=['data_quality'] )
+
+        time.sleep( 1 ) ### wait one second between each check to ease the load on the cpu
             
 ### report to GraceDB that we've finished follow-up
 if upload_or_verbose:
