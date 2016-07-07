@@ -58,6 +58,7 @@ gracedb_url = config.get('general', 'gracedb-url')
 outdir      = config.get('general', 'outdir')
 executable  = config.get('general', 'executable')
 
+### figure out which chansets to process and in what order
 chansets = config.get('general', 'chansets').split()
 chansets.sort(key=lambda chanset: config.getfloat(chanset, 'win')) ### extract windows for each chanset and order them accordingly
 
@@ -73,7 +74,8 @@ persist = config.getboolean('general', 'persist') \
             and upload_or_verbose \
             and (not condor)      ### a only persist if we will report somethin gnd we aren't submitting through condor
 
-farThr  = config.getfloat('general', 'farThr') ### threshold on FAR for which events we follow-up
+### FAR threshold to downselect events from GraceDB
+farThr  = config.getfloat('general', 'farThr')
 
 #-------------------------------------------------
 
@@ -179,18 +181,44 @@ for chanset in chansets:
             ldr_server = None
         ldr_url_type = config.get(chanset, 'ldr-url-type')
 
-        frames   = dataFind.ldr_find_frames( ldr_server, ldr_url_type, frame_type, ifo, start, stride, verbose=opts.Verbose )
+        frames   = dataFind.ldr_find_frames( ldr_server, 
+                                             ldr_url_type, 
+                                             frame_type, 
+                                             ifo, 
+                                             start, 
+                                             stride, 
+                                             verbose=opts.Verbose 
+                                           )
         coverage = dataFind.coverage(frames, start, stride)
-        while (coverage < 1) and (tconvert('now')<timeout):
-            frames   = dataFind.ldr_find_frames( ldr_server, ldr_url_type, frame_type, ifo, start, stride, verbose=opts.Verbose )
+        while (coverage < 1) and (tconvert('now')<timeout): ### still not enough coverage and we haven't timed out
+            frames   = dataFind.ldr_find_frames( ldr_server, 
+                                                 ldr_url_type, 
+                                                 frame_type, 
+                                                 ifo, 
+                                                 start, 
+                                                 stride, 
+                                                 verbose=opts.Verbose 
+                                               )
             coverage = dataFind.coverage(frames, start, stride)
 
     elif lookup == 'shm': ### find directly from shared memory directory
         shm_dir  = config.get(chanset, 'shm_dir')
-        frames   = dataFind.shm_find_frames( shm_dir, ifo, frame_type, start, stride, verbose=opts.Verbose )
+        frames   = dataFind.shm_find_frames( shm_dir, 
+                                             ifo, 
+                                             frame_type, 
+                                             start, 
+                                             stride, 
+                                             verbose=opts.Verbose 
+                                           )
         coverage = dataFind.coverage(frames, start, stride)
         while (coverage < 1) and (tconvert('now')<timeout):
-            frames   = dataFind.shm_find_frames( shm_dir, ifo, frame_type, start, stride, verbose=opts.Verbose )
+            frames   = dataFind.shm_find_frames( shm_dir, 
+                                                 ifo, 
+                                                 frame_type, 
+                                                 start, 
+                                                 stride, 
+                                                 verbose=opts.Verbose 
+                                               )
             coverage = dataFind.coverage(frames, start, stride)
 
     else:
@@ -208,11 +236,6 @@ for chanset in chansets:
             print "    %s -> %s"%(frame, newframe)
         fork.fork(['cp', frame, newframe]).wait() ### delegates to subprocess.Popen
 
-    ### define execution command
-    cmd, stdout, stderr = commands.omegaScanCommand( executable, gps, exeConfig, this_outdir, this_outdir )
-    if opts.verbose:
-        print "%s 1> %s 2> %s"%(" ".join(cmd), stdout, stderr)
-
     #-----------------------------------------------------------------------------------------------
     #
     #
@@ -224,6 +247,7 @@ for chanset in chansets:
 
     ### submit execution command
     if condor: ### run under condor
+        ### define execution command
         cmd, stdout, stderr = commands.condorOmegaScanCommand( executable,
                                                                gps, 
                                                                exeConfig, 
@@ -246,6 +270,7 @@ for chanset in chansets:
                 gdb.writeLog( opts.graceid, message=message, tagname=['data_quality'] )
 
     else: ### run on the head node
+        ### define execution command
         cmd, stdout, stderr = commands.omegaScanCommand( executable, 
                                                          gps, 
                                                          exeConfig, 
