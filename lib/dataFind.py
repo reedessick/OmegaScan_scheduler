@@ -2,6 +2,7 @@ description = "a module that handles data discovery"
 
 #-------------------------------------------------
 
+import glob
 import subprocess as sp
 
 #-------------------------------------------------

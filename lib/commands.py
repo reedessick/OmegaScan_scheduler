@@ -15,7 +15,7 @@ def omegaScanCommand( exe, gps, exeConfig, frameDir, outdir ):
 
     return cmd, stdout, stderr
 
-def condorOmegaScanCommand( exe, gps, exeConfig, frameDir, outdir, accounting_group, accounting_group_user, universe='vanilla' ):
+def condorOmegaScanCommand( exe, gps, exeConfig, frameDir, outdir, accounting_group, accounting_group_user, universe='vanilla', retry=0 ):
     """
     returns cmd, stdout, stderr
         cmd    : a list of strings compatible with subprocess.Popen
@@ -23,15 +23,12 @@ def condorOmegaScanCommand( exe, gps, exeConfig, frameDir, outdir, accounting_gr
         stderr : path to stderr (written in outdir)
     NOTE: command returned is for condor_submit_dag, not the actual OmegaScan. The actual OmegaScan command is wrapped within a sub file called from the dag.
     """
-
-    raise NotImplementedError
-
     ### write sub file
     sub = "%s/%d.sub"%(outdir, gps)
     sub_obj = open(sub, 'w')
     sub_obj.write( '''universe = %(universe)s
 executable = %(exe)s
-arguments = "scan %(gps).9f -c %(exeConfig)s -f %(frameDir)s -o %(outdir) -r"
+arguments = "scan %(gps).9f -c %(exeConfig)s -f %(frameDir)s -o %(outdir)s -r"
 getenv = true
 accounting_group = %(accounting_group)s
 accounting_group_user = %(accounting_group_user)s
@@ -43,7 +40,7 @@ queue 1'''%{'universe':universe,
             'exe':exe,
             'gps':gps,
             'exeConfig':exeConfig,
-            'framedir':frameDir,
+            'frameDir':frameDir,
             'outdir':outdir,
             'accounting_group':accounting_group,
             'accounting_group_user':accounting_group_user,
@@ -54,9 +51,8 @@ queue 1'''%{'universe':universe,
     ### write dag file
     dag = "%s/%d.dag"%(outdir, gps)
     dag_obj = open(dag, 'w')
-    dag_obj.write( '''JOB %(gps)d %(sub)s
-VARS %(gps)d
-RETRY %(gps) %(retry)d'''%{'gps':gps, 
+    dag_obj.write( '''JOB   %(gps)d %(sub)s
+RETRY %(gps)d %(retry)d'''%{'gps':gps, 
                            'sub':sub, 
                            'retry':retry,
                           } 

@@ -16,7 +16,7 @@ import commands
 import time
 from lal.gpstime import tconvert
 
-#from ligo.gracedb.rest import GraceDb
+from ligo.gracedb.rest import GraceDb
 
 from ConfigParser import SafeConfigParser
 
@@ -69,6 +69,7 @@ if condor:
     universe              = config.get('condor', 'universe')
     accounting_group      = config.get('condor', 'accounting_group')
     accounting_group_user = config.get('condor', 'accounting_group_user')
+    retry                 = config.getint('condor', 'retry')
 
 ### whether to stick around after forking processes
 persist = config.getboolean('general', 'persist') \
@@ -204,7 +205,7 @@ for chanset in chansets:
             coverage = dataFind.coverage(frames, start, stride)
 
     elif lookup == 'shm': ### find directly from shared memory directory
-        shm_dir  = config.get(chanset, 'shm_dir')
+        shm_dir  = config.get(chanset, 'shm-dir')
         frames   = dataFind.shm_find_frames( shm_dir, 
                                              ifo, 
                                              frame_type, 
@@ -248,7 +249,8 @@ for chanset in chansets:
                                                                this_outdir, 
                                                                accounting_group, 
                                                                accounting_group_user,
-                                                               universe=universe
+                                                               universe=universe,
+                                                               retry=retry,
                                                              )
         if opts.verbose:
             print "%s 1> %s 2> %s"%(" ".join(cmd), stdout, stderr)
@@ -281,7 +283,7 @@ for chanset in chansets:
             message = "OmegaScan process over %s within [%.3f, %.3f] started. Output can be found <a href=\"%s\">here</a>."%(chanset, start, end, this_outurl)
             if opts.verbose:
                 print message
-            if opts.verbose:
+            if opts.upload:
                 gdb.writeLog( opts.graceid, message=message, tagname=['data_quality'] )
 
         else: ### (double) fork and forget about proc
