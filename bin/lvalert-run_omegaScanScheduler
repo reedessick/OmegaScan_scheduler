@@ -1,4 +1,4 @@
 #!/bin/bash
 cd /home/reed.essick/OmegaScan_scheduler/
 source /home/reed.essick/OmegaScan_scheduler/setup.sh
-/home/reed.essick/OmegaScan_scheduler/bin/omegascan_scheduler.py -V /home/reed.essick/OmegaScan_scheduler/etc/example.ini 1>> /home/reed.essick/OmegaScan_scheduler/log/omegascan_scheduler.out 2>> /home/reed.essick/OmegaScan_scheduler/log/omegascan_scheduler.err 
+/home/reed.essick/OmegaScan_scheduler/bin/omegaScan_scheduler.py -V /home/reed.essick/OmegaScan_scheduler/etc/example.ini 1>> /home/reed.essick/OmegaScan_scheduler/log/omegaScan_scheduler.out 2>> /home/reed.essick/OmegaScan_scheduler/log/omegaScan_scheduler.err 

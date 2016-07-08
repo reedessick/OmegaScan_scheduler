@@ -107,15 +107,18 @@ if opts.graceid==None:
             print "ignoring alert"
         sys.exit(0)
 
-    if farThr < alert['far']:
-        if opts.Verbose:
-            print "ignoring alert due to high FAR (%.3e > %.3e)"%(alert['far'], farThr)
-
     opts.graceid = alert['uid']
 
 ### extract things about the event
 gdb = GraceDb( gracedb_url )
-gps = gdb.event( opts.graceid ).json()['gpstime']
+event = gdb.event( opts.graceid ).json()
+
+gps = event['gpstime']
+far = event['far']
+if farThr < far:
+    if opts.Verbose:
+        print "ignoring alert due to high FAR (%.3e > %.3e)"%(alert['far'], farThr)
+    sys.exit(0)
 
 if opts.verbose:
     print "generating OmegaScans for : %s\n    gps : %.6f"%(opts.graceid, gps)
