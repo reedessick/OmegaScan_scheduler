@@ -1,0 +1,2 @@
+#!/bin/bash
+lvalert_listen -a gdb_processor -s lvalert.cgca.uwm.edu -r omegaScanScheduler -c /home/reed.essick/OmegaScan_scheduler/etc/lvalert-OmegaScanScheduler.ini --dont-wait
