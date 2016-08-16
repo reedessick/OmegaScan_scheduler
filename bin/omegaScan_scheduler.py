@@ -151,8 +151,8 @@ for chanset in chansets:
         print "processing %s\n    ifo        : %s\n    frame_type : %s\n    config     : %s"%(chanset, ifo, frame_type, exeConfig)
 
     ### set up output directory and url
-    this_outdir = os.path.join(outdir, opts.graceid, chanset.replace(" ",""))
-    this_outurl = os.path.join(outurl, opts.graceid, chanset.replace(" ",""))
+    this_outdir = os.path.join(outdir, opts.graceid, "scans", chanset.replace(" ",""))
+    this_outurl = os.path.join(outurl, opts.graceid, "scans", chanset.replace(" ",""))
     if opts.verbose:    
         print "  writing into : %s -> %s"%(this_outdir, this_outurl)
 
