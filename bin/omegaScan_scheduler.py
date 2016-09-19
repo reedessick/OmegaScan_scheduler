@@ -24,6 +24,10 @@ from optparse import OptionParser
 
 #-------------------------------------------------
 
+tagname = ['data_quality', 'OmegaScan'] ### these tags should always be applied when writing log messages
+
+#-------------------------------------------------
+
 parser = OptionParser(usage=usage, description=description)
 
 parser.add_option('-v', '--verbose', default=False, action='store_true')
@@ -134,7 +138,7 @@ if upload_or_verbose:
     if opts.verbose:
         print message
     if opts.upload:
-        gdb.writeLog( opts.graceid, message=message, tagname=['data_quality'] )
+        gdb.writeLog( opts.graceid, message=message, tagname=tagname )
 
 ### iterate through chansets, processing each one separately
 if persist:
@@ -260,12 +264,12 @@ for chanset in chansets:
         fork.safe_fork( cmd, stdout=stdout, stderr=stderr)
 
         ### report link to GraceDB for this chanset
-        if opts.verbose or opts.upload:
+        if upload_or_verbose:
             message = "OmegaScan process over %s within [%.3f, %.3f] started. Output can be found <a href=\"%s\">here</a>. WARNING: submitting through condor and will not track processes to ensure completion"%(chanset, start, end, this_outurl)
             if opts.verbose:
                 print message
             if opts.upload:
-                gdb.writeLog( opts.graceid, message=message, tagname=['data_quality'] )
+                gdb.writeLog( opts.graceid, message=message, tagname=tagname )
 
     else: ### run on the head node
         ### define execution command
@@ -287,18 +291,18 @@ for chanset in chansets:
             if opts.verbose:
                 print message
             if opts.upload:
-                gdb.writeLog( opts.graceid, message=message, tagname=['data_quality'] )
+                gdb.writeLog( opts.graceid, message=message, tagname=tagname )
 
         else: ### (double) fork and forget about proc
             fork.safe_fork( cmd, stdout=stdout, stderr=stderr)
 
             ### report link to GraceDB for this chanset
-            if opts.verbose or opts.upload:
+            if upload_or_verbose:
                 message = "OmegaScan process over %s within [%.3f, %.3f] started. Output can be found <a href=\"%s\">here</a>. WARNING: will not track processes to ensure completion"%(chanset, start, end, this_outurl)
                 if opts.verbose:
                     print message
                 if opts.upload:
-                    gdb.writeLog( opts.graceid, message=message, tagname=['data_quality'] )
+                    gdb.writeLog( opts.graceid, message=message, tagname=tagname )
 
 if persist: ### wait around for all the processes to finish
     if opts.verbose:
@@ -319,7 +323,7 @@ if persist: ### wait around for all the processes to finish
             if opts.verbose:
                 print message
             if opts.upload:
-                gdb.writeLog( opts.graceid, message=message, tagname=['data_quality'] )
+                gdb.writeLog( opts.graceid, message=message, tagname=tagname )
 
         time.sleep( 1 ) ### wait one second between each check to ease the load on the cpu
             
@@ -331,4 +335,4 @@ if upload_or_verbose:
     if opts.verbose:
         print message
     if opts.upload:
-        gdb.writeLog( opts.graceid, message=message, tagname=['data_quality'] )
+        gdb.writeLog( opts.graceid, message=message, tagname=tagname )
