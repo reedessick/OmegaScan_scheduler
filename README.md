@@ -11,7 +11,7 @@ This can launch multiple OmegaScan processes. For each process, we need to know 
   - bin/omegaScan_scheduler.py
     - The main scheduling script. This actually performs data discovery and formats the output directories, launching and managing child processes. Several submission modes are possible: 
         - submission through condor (currently does not allow tracking of spawned processes after submission)
-        - submission to the local node (can either wait for processes to finish and ensure sucess or ``orphan'' them after forking)
+        - submission to the local node (can either wait for processes to finish and ensure sucess or ''orphan'' them after forking)
     - Supports annotation within GraceDb using standard tags (hardcoded)
 
   - bin/is_lvalert_alive.sh
@@ -27,7 +27,7 @@ An example config file exists within the repo. Comments contained therein descri
 
 # Installation and dependencies
 
-This module depends on LALSuite (tconvert) and the GraceDb REST client. Both should be installed and managed by sysadmins on any LVC cluster. To ``install'' this package, simply clone the repo, enter the working directory and source ``./setup.sh''. This is a clunky way to update your path, and explains the first two commands in the example crontab above.
+This module depends on LALSuite (tconvert) and the GraceDb REST client. Both should be installed and managed by sysadmins on any LVC cluster. To ''install'' this package, simply clone the repo, enter the working directory and source ''./setup.sh''. This is a clunky way to update your path, and explains the first two commands in the example crontab above.
 
 Users should be careful to build their own config files for both omegaScan_scheduler.py and lvalert_listen. However, examples are included in the repo and working versions of this module can be found under the detchar account at
 
