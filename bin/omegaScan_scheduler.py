@@ -91,8 +91,8 @@ if opts.robot_cert:
         del os.environ['X509_USER_PROXY']
 
     ### get cert and key from ini file
-    os.environ['X509_USER_CERT'] = config.get('ldg_certificate', 'robot_certificate')
-    os.environ['X509_USER_KEY']  = config.get('ldg_certificate', 'robot_key')
+    os.environ['X509_USER_CERT'] = config.get('robot cert', 'robot_certificate')
+    os.environ['X509_USER_KEY']  = config.get('robot cert', 'robot_key')
 
 #-------------------------------------------------
 
