@@ -1,7 +1,7 @@
 #!/usr/bin/python
-usage = "omegaScan_scheduler.py [--options] config.ini"
+usage       = "omegaScan_scheduler.py [--options] config.ini"
 description = "schedules and forks OmegaScan processes"
-author = "reed.essick@ligo.org"
+author      = "reed.essick@ligo.org"
 
 #-------------------------------------------------
 
@@ -234,8 +234,14 @@ for chanset in chansets:
     else:
         raise ValueError( 'lookup=%s not recognized!'%(lookup) )
 
-    if coverage < 1:
-        raise ValueError( 'could not find complete coverage!\n%s'%("\n".join(frames)) )
+    if coverage < 1: ### not enough coverage
+        if upload_or_verbose:
+            message = "could not find complete coverage for %s!\n%s"%(chanset, "\n".join(frames))
+            if opts.verbose:
+                print message
+            if opts.upload:
+                gdb.writeLog( opts.graceid, message=message, tagname=tagname )
+        continue ### not enough coverage, skipping
 
     ### copy frames into a local directory
     if opts.verbose:
