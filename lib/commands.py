@@ -3,6 +3,15 @@ author      = "reed.essick@ligo.org"
 
 #-------------------------------------------------
 
+def gps2str( gps ):
+    """
+    standardizes how gps is converted from a float to a string for commands
+    useful for predicitng filenames produced by the scans
+    """
+    return "%.9f"%gps
+
+#-------------------------------------------------
+
 def omegaScanCommand( exe, gps, exeConfig, frameDir, outdir ):
     """
     returns cmd, stdout, stderr
@@ -10,7 +19,7 @@ def omegaScanCommand( exe, gps, exeConfig, frameDir, outdir ):
         stdout : path to stdout (written in outdir)
         stderr : path to stderr (written in outdir)
     """
-    cmd = [exe, 'scan', "%.9f"%(gps), '-c', exeConfig, '-f', frameDir, '-o', outdir, '-r']
+    cmd = [exe, 'scan', gps2str(gps), '-c', exeConfig, '-f', frameDir, '-o', outdir, '-r']
     stdout = "%s/%d.out"%(outdir, gps)
     stderr = "%s/%d.err"%(outdir, gps)
 
@@ -29,7 +38,7 @@ def condorOmegaScanCommand( exe, gps, exeConfig, frameDir, outdir, accounting_gr
     sub_obj = open(sub, 'w')
     sub_obj.write( '''universe = %(universe)s
 executable = %(exe)s
-arguments = "scan %(gps).9f -c %(exeConfig)s -f %(frameDir)s -o %(outdir)s -r"
+arguments = "scan %(gpsStr)s -c %(exeConfig)s -f %(frameDir)s -o %(outdir)s -r"
 getenv = true
 accounting_group = %(accounting_group)s
 accounting_group_user = %(accounting_group_user)s
@@ -40,6 +49,7 @@ notification = never
 queue 1'''%{'universe':universe,
             'exe':exe,
             'gps':gps,
+            'gpsStr':gps2str(gps),
             'exeConfig':exeConfig,
             'frameDir':frameDir,
             'outdir':outdir,

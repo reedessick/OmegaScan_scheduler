@@ -3,6 +3,12 @@ author      = "reed.essick@ligo.org"
 
 #-------------------------------------------------
 
+import os
+
+from commands import gps2str
+
+#-------------------------------------------------
+
 def parseOmegaScanConfig( filename ):
     '''
     parses OmegaScan config file into a list of dictionaries.
@@ -54,3 +60,24 @@ def str2obj( val, warn=False ):
                 if warn:
                     raise ValueError('could not parse val=%s'%val)
     return val
+
+def chan2url( chan, gps, outurl='./' ):
+    '''
+    map information about a single channel (format follows what's produced by parseOmegaScanConfig) into expected urls for the associated figures.
+
+    NOTE: we modify the dictionary stored under 'chan' here!
+    '''
+    chanName  = chan['channelName']
+    wins      = chan['plotTimeRanges']
+    gps = gps2str(gps) ### standardizes how gps is passed -> how OmegaScans generate filenames
+
+    ### add pointers to spectrograms, eventgrams, and timeseries
+    ### NOTE: we actually modify the object and do NOT create a copy. We only add information, so this should be pretty safe
+    chan.update( {'spectrogram' : dict((key, dict((win, os.path.join(outurl, "%s_%s_%.2f_spectrogram_%s.png"%(gps, chanName, win, key))) for win in wins)) for key in ['autoscaled', 'raw', 'whitened']),
+                  'timeseries'  : dict((key, dict((win, os.path.join(outurl, "%s_%s_%.2f_timeseries_%s.png"%(gps, chanName, win, key)))  for win in wins)) for key in ['highpassed', 'raw', 'whitened']),
+                  'eventgram'   : dict((key, dict((win, os.path.join(outurl, "%s_%s_%.2f_eventgram_%s.png"%(gps, chanName, win, key)))   for win in wins)) for key in ['autoscaled', 'raw', 'whitened']),
+                 }
+               )
+
+    ### return the object
+    return chan

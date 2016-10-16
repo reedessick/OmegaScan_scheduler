@@ -9,6 +9,9 @@ import os
 import sys
 import json
 
+from getpass import getuser
+from socket import gethostname
+
 import parse
 import dataFind
 import fork
@@ -153,6 +156,10 @@ if os.path.exists(frmdir):
 else:
     os.makedirs( frmdir )
 
+### set up variables that are common for all chansets
+username = getuser()
+hostname = gethostname()
+
 ### iterate through chansets, processing each one separately
 if persist:
     procs = []
@@ -168,8 +175,8 @@ for chanset in chansets:
 
     ### parse exeConfig, get frame types, etc
     chans = parse.parseOmegaScanConfig( exeConfig )
-    frametypes = set( chan['frameType'] for chan in chans )
-    for frame_type in frametypes: ### ensure we have a section for each frame type
+    frameTypes = set( chan['frameType'] for chan in chans )
+    for frame_type in frameTypes: ### ensure we have a section for each frame type
         assert config.has_section(frame_type), '%s has no section for frameType=%s'%(config_name, frame_type)
 
     ### figure out when to processes
@@ -192,7 +199,7 @@ for chanset in chansets:
     if opts.verbose:
         print "  finding frames"
 
-    for frame_type in frametypes:
+    for frame_type in frameTypes:
 
         lookup  = config.get(frame_type, 'lookup')
         timeout = end + config.getfloat(frame_type, 'timeout') ### add timeout to the end time
@@ -271,7 +278,7 @@ for chanset in chansets:
             if not os.path.exists( newframe ): ### only copy if frame doesn't already exists
                 fork.fork(['cp', frame, newframe]).wait() ### delegates to subprocess.Popen
 
-    else: ### we did not break from the iteration over frametypes, so we want to actually run the scan
+    else: ### we did not break from the iteration over frameTypes, so we want to actually run the scan
 
         #-----------------------------------------
         # SUBMIT COMMANDS
@@ -288,6 +295,25 @@ for chanset in chansets:
                 raise ValueError( "directory=%s already exists!"%(this_outdir) )
         else:
             os.makedirs( this_outdir )
+
+        ### generate json file with expected paths
+        jsondict = {
+                 'hostname'   : hostname,
+                 'username'   : username,
+                 'chanset'    : chanset,
+                 'frameTypes' : list(frameTypes),
+                 'config'     : exeConfig,
+                 'gps'        : gps,
+                 'url'        : os.path.join( this_outurl, 'index.html' ),
+                 'channels'   : dict( (chan['channelName'], parse.chan2url( chan, gps, this_outurl )) for chan in chans ),
+                }
+
+        jsonname = os.path.join(this_outdir, '%s.json'%chanset.replace(" ","-"))
+        if opts.verbose:
+            print "  writing pointers to output : %s"%jsonname
+        jsonfile = open(jsonname, 'w')
+        json.dump( jsondict, jsonfile )
+        jsonfile.close()
 
         ### submit execution command
         if condor: ### run under condor
@@ -312,7 +338,7 @@ for chanset in chansets:
                 if opts.verbose:
                     print message
                 if opts.upload:
-                    gdb.writeLog( opts.graceid, message=message, tagname=tagname )
+                    gdb.writeLog( opts.graceid, message=message, filename=jsonname, tagname=tagname )
 
         else: ### run on the head node
             ### define execution command
@@ -334,7 +360,7 @@ for chanset in chansets:
                 if opts.verbose:
                     print message
                 if opts.upload:
-                    gdb.writeLog( opts.graceid, message=message, tagname=tagname )
+                    gdb.writeLog( opts.graceid, message=message, filename=jsonname, tagname=tagname )
 
             else: ### (double) fork and forget about proc
                 fork.safe_fork( cmd, stdout=stdout, stderr=stderr)
@@ -345,7 +371,7 @@ for chanset in chansets:
                     if opts.verbose:
                         print message
                     if opts.upload:
-                        gdb.writeLog( opts.graceid, message=message, tagname=tagname )
+                        gdb.writeLog( opts.graceid, message=message, filename=jsonname, tagname=tagname )
 
 #-------------------------------------------------
 # WAIT FOR COMMANDS TO FINISH, CLEAN UP
