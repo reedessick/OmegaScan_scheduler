@@ -9,6 +9,7 @@ import os
 import sys
 import json
 
+import parse
 import dataFind
 import fork
 import commands
@@ -38,6 +39,8 @@ parser.add_option('-g', '--graceid', default=None, type='string', help='if suppl
 parser.add_option('-s', '--skip-upload', default=False, action='store_true', help='do not upload pointers to GraceDB')
 parser.add_option('-r', '--robot-cert', default=False, action='store_true', help='set up robot certificate')
 
+parser.add_option('-f', '--force', default=False, action='store_true', help='launch scans even if directory already exists or data is incomplete')
+
 opts, args = parser.parse_args()
 
 if len(args) != 1:
@@ -65,6 +68,8 @@ executable  = config.get('general', 'executable')
 
 ### figure out which chansets to process and in what order
 chansets = config.get('general', 'chansets').split()
+for chanset in chansets: ### ensure we have all the sections we need
+    assert config.has_section(chanset), '%s has no section corresponding to chanset=%s'%(config_name, chanset)
 chansets.sort(key=lambda chanset: config.getfloat(chanset, 'win')) ### extract windows for each chanset and order them accordingly
 
 ### whether to use condor
@@ -121,7 +126,7 @@ gps = event['gpstime']
 far = event['far']
 if farThr < far:
     if opts.Verbose:
-        print "ignoring alert due to high FAR (%.3e > %.3e)"%(alert['far'], farThr)
+        print "ignoring alert due to high FAR (%.3e > %.3e)"%(far, farThr)
     sys.exit(0)
 
 if opts.verbose:
@@ -140,6 +145,14 @@ if upload_or_verbose:
     if opts.upload:
         gdb.writeLog( opts.graceid, message=message, tagname=tagname )
 
+### set up frame directory
+frmdir = os.path.join(outdir, opts.graceid, "frames")
+if os.path.exists(frmdir):
+    if not opts.force: ### ignore existing data if --force was supplied
+        raise ValueError( "directory=%s already exists!"%(frmdir) )
+else:
+    os.makedirs( frmdir )
+
 ### iterate through chansets, processing each one separately
 if persist:
     procs = []
@@ -148,32 +161,22 @@ for chanset in chansets:
 
     ### extract info about this chanset
     ifo        = config.get(chanset, 'ifo')
-    frame_type = config.get(chanset, 'frame_type')
     exeConfig  = config.get(chanset, 'config')
 
     if opts.verbose:
-        print "processing %s\n    ifo        : %s\n    frame_type : %s\n    config     : %s"%(chanset, ifo, frame_type, exeConfig)
+        print "processing %s\n    ifo        : %s\n    config     : %s"%(chanset, ifo, exeConfig)
 
-    ### set up output directory and url
-    this_outdir = os.path.join(outdir, opts.graceid, "scans", chanset.replace(" ",""))
-    this_outurl = os.path.join(outurl, opts.graceid, "scans", chanset.replace(" ",""))
-    if opts.verbose:    
-        print "  writing into : %s -> %s"%(this_outdir, this_outurl)
-
-    if os.path.exists(this_outdir):
-        raise ValueError( "directory=%s already exists!"%(this_outdir) )
-    else:
-        os.makedirs( this_outdir )
+    ### parse exeConfig, get frame types, etc
+    chans = parse.parseOmegaScanConfig( exeConfig )
+    frametypes = set( chan['frameType'] for chan in chans )
+    for frame_type in frametypes: ### ensure we have a section for each frame type
+        assert config.has_section(frame_type), '%s has no section for frameType=%s'%(config_name, frame_type)
 
     ### figure out when to processes
     win    = config.getfloat(chanset, 'win')
     start  = gps-win
     end    = gps+win
     stride = 2*win
-
-    ### go find data
-    lookup  = config.get(chanset, 'lookup')
-    timeout = end + config.getfloat(chanset, 'timeout') ### add timeout to the end time
 
     ### wait until we have a chance of finding data (causality)
     wait = end - tconvert('now')
@@ -182,25 +185,28 @@ for chanset in chansets:
             print "  waiting %.3f sec"%(wait)
         time.sleep( wait )
 
+    #---------------------------------------------
+    # DATA DISCOVERY
+    #---------------------------------------------
+
     if opts.verbose:
         print "  finding frames"
-    if lookup == 'ldr': ### find with LDR servers
-        if config.has_option(chanset, 'ldr-server'):
-            ldr_server = config.get(chanset, 'ldr-server')
-        else:
-            ldr_server = None
-        ldr_url_type = config.get(chanset, 'ldr-url-type')
 
-        frames   = dataFind.ldr_find_frames( ldr_server, 
-                                             ldr_url_type, 
-                                             frame_type, 
-                                             ifo, 
-                                             start, 
-                                             stride, 
-                                             verbose=opts.Verbose 
-                                           )
-        coverage = dataFind.coverage(frames, start, stride)
-        while (coverage < 1) and (tconvert('now')<timeout): ### still not enough coverage and we haven't timed out
+    for frame_type in frametypes:
+
+        lookup  = config.get(frame_type, 'lookup')
+        timeout = end + config.getfloat(frame_type, 'timeout') ### add timeout to the end time
+
+        if opts.verbose:
+            print "    %s -> %s"%(frame_type, lookup)
+
+        if lookup == 'ldr': ### find with LDR servers
+            if config.has_option(frame_type, 'ldr-server'):
+                ldr_server = config.get(frame_type, 'ldr-server')
+            else:
+                ldr_server = None
+            ldr_url_type = config.get(frame_type, 'ldr-url-type')
+
             frames   = dataFind.ldr_find_frames( ldr_server, 
                                                  ldr_url_type, 
                                                  frame_type, 
@@ -210,18 +216,19 @@ for chanset in chansets:
                                                  verbose=opts.Verbose 
                                                )
             coverage = dataFind.coverage(frames, start, stride)
+            while (coverage < 1) and (tconvert('now')<timeout): ### still not enough coverage and we haven't timed out
+                frames   = dataFind.ldr_find_frames( ldr_server, 
+                                                     ldr_url_type, 
+                                                     frame_type, 
+                                                     ifo, 
+                                                     start, 
+                                                     stride, 
+                                                     verbose=opts.Verbose 
+                                                   )
+                coverage = dataFind.coverage(frames, start, stride)
 
-    elif lookup == 'shm': ### find directly from shared memory directory
-        shm_dir  = config.get(chanset, 'shm-dir')
-        frames   = dataFind.shm_find_frames( shm_dir, 
-                                             ifo, 
-                                             frame_type, 
-                                             start, 
-                                             stride, 
-                                             verbose=opts.Verbose 
-                                           )
-        coverage = dataFind.coverage(frames, start, stride)
-        while (coverage < 1) and (tconvert('now')<timeout):
+        elif lookup == 'shm': ### find directly from shared memory directory
+            shm_dir  = config.get(frame_type, 'shm-dir')
             frames   = dataFind.shm_find_frames( shm_dir, 
                                                  ifo, 
                                                  frame_type, 
@@ -230,85 +237,119 @@ for chanset in chansets:
                                                  verbose=opts.Verbose 
                                                )
             coverage = dataFind.coverage(frames, start, stride)
+            while (coverage < 1) and (tconvert('now')<timeout):
+                frames   = dataFind.shm_find_frames( shm_dir, 
+                                                     ifo, 
+                                                     frame_type, 
+                                                     start, 
+                                                     stride, 
+                                                     verbose=opts.Verbose 
+                                                   )
+                coverage = dataFind.coverage(frames, start, stride)
 
-    else:
-        raise ValueError( 'lookup=%s not recognized!'%(lookup) )
+        else:
+            raise ValueError( 'lookup=%s not recognized!'%(lookup) )
 
-    if coverage < 1: ### not enough coverage
-        if upload_or_verbose:
-            message = "could not find complete coverage for %s!\n%s"%(chanset, "\n".join(frames))
-            if opts.verbose:
-                print message
-            if opts.upload:
-                gdb.writeLog( opts.graceid, message=message, tagname=tagname )
-        continue ### not enough coverage, skipping
-
-    ### copy frames into a local directory
-    if opts.verbose:
-        print "  copying frames into local directory"
-    newframes = ["%s/%s"%(this_outdir, os.path.basename(frame)) for frame in frames]
-    for frame, newframe in zip(frames, newframes):
-        if opts.Verbose:
-            print "    %s -> %s"%(frame, newframe)
-        fork.fork(['cp', frame, newframe]).wait() ### delegates to subprocess.Popen
-
-    ### submit execution command
-    if condor: ### run under condor
-        ### define execution command
-        cmd, stdout, stderr = commands.condorOmegaScanCommand( executable,
-                                                               gps, 
-                                                               exeConfig, 
-                                                               this_outdir, 
-                                                               this_outdir, 
-                                                               accounting_group, 
-                                                               accounting_group_user,
-                                                               universe=universe,
-                                                               retry=retry,
-                                                             )
-        if opts.verbose:
-            print "%s 1> %s 2> %s"%(" ".join(cmd), stdout, stderr)
-        fork.safe_fork( cmd, stdout=stdout, stderr=stderr)
-
-        ### report link to GraceDB for this chanset
-        if upload_or_verbose:
-            message = "OmegaScan process over %s within [%.3f, %.3f] started. Output can be found <a href=\"%s\">here</a>. WARNING: submitting through condor and will not track processes to ensure completion"%(chanset, start, end, this_outurl)
-            if opts.verbose:
-                print message
-            if opts.upload:
-                gdb.writeLog( opts.graceid, message=message, tagname=tagname )
-
-    else: ### run on the head node
-        ### define execution command
-        cmd, stdout, stderr = commands.omegaScanCommand( executable, 
-                                                         gps, 
-                                                         exeConfig, 
-                                                         this_outdir, 
-                                                         this_outdir 
-                                                       )
-        if opts.verbose:
-            print "%s 1> %s 2> %s"%(" ".join(cmd), stdout, stderr)
-        if persist: ### submit directly through subprocess and track proc
-            proc = fork.fork( cmd, stdout=stdout, stderr=stderr )
-            procs.append( (chanset, start, end, proc) )
-
-            ### report link to GraceDB for this chanset
-            ### because persist is True, we know that upload_or_verbose must also be True
-            message = "OmegaScan process over %s within [%.3f, %.3f] started. Output can be found <a href=\"%s\">here</a>."%(chanset, start, end, this_outurl)
-            if opts.verbose:
-                print message
-            if opts.upload:
-                gdb.writeLog( opts.graceid, message=message, tagname=tagname )
-
-        else: ### (double) fork and forget about proc
-            fork.safe_fork( cmd, stdout=stdout, stderr=stderr)
-
-            ### report link to GraceDB for this chanset
+        ### copy frames locally
+        if coverage < 1: ### could not find enough coverage after timing out
             if upload_or_verbose:
-                message = "OmegaScan process over %s within [%.3f, %.3f] started. Output can be found <a href=\"%s\">here</a>. WARNING: will not track processes to ensure completion"%(chanset, start, end, this_outurl)
+                message = "could not find complete coverage for %s!\n%s"%(chanset, "\n".join(frames))
                 if opts.verbose:
                     print message
                 if opts.upload:
                     gdb.writeLog( opts.graceid, message=message, tagname=tagname )
+
+            if not opts.force: ### we aren't forcing this scan, so we stop looking up data and move to the next chanset
+                break
+
+        if opts.verbose:
+            print "  copying frames into local directory"
+        newframes = ["%s/%s"%(frmdir, os.path.basename(frame)) for frame in frames]
+        for frame, newframe in zip(frames, newframes):
+            if opts.Verbose:
+                print "    %s -> %s"%(frame, newframe)
+            if not os.path.exists( newframe ): ### only copy if frame doesn't already exists
+                fork.fork(['cp', frame, newframe]).wait() ### delegates to subprocess.Popen
+
+    else: ### we did not break from the iteration over frametypes, so we want to actually run the scan
+
+        #-----------------------------------------
+        # SUBMIT COMMANDS
+        #-----------------------------------------
+
+        ### set up output directory and url
+        this_outdir = os.path.join(outdir, opts.graceid, "scans", chanset.replace(" ",""))
+        this_outurl = os.path.join(outurl, opts.graceid, "scans", chanset.replace(" ",""))
+        if opts.verbose:
+            print "  writing into : %s -> %s"%(this_outdir, this_outurl)
+
+        if os.path.exists(this_outdir):
+            if not opts.force: ### ignore existing data if --force was supplied
+                raise ValueError( "directory=%s already exists!"%(this_outdir) )
+        else:
+            os.makedirs( this_outdir )
+
+        ### submit execution command
+        if condor: ### run under condor
+            ### define execution command
+            cmd, stdout, stderr = commands.condorOmegaScanCommand( executable,
+                                                                   gps, 
+                                                                   exeConfig, 
+                                                                   frmdir, 
+                                                                   this_outdir, 
+                                                                   accounting_group, 
+                                                                   accounting_group_user,
+                                                                   universe=universe,
+                                                                   retry=retry,
+                                                                 )
+            if opts.verbose:
+                print "%s 1> %s 2> %s"%(" ".join(cmd), stdout, stderr)
+            fork.safe_fork( cmd, stdout=stdout, stderr=stderr)
+
+            ### report link to GraceDB for this chanset
+            if upload_or_verbose:
+                message = "OmegaScan process over %s within [%.3f, %.3f] started. Output can be found <a href=\"%s\">here</a>. WARNING: submitting through condor and will not track processes to ensure completion"%(chanset, start, end, this_outurl)
+                if opts.verbose:
+                    print message
+                if opts.upload:
+                    gdb.writeLog( opts.graceid, message=message, tagname=tagname )
+
+        else: ### run on the head node
+            ### define execution command
+            cmd, stdout, stderr = commands.omegaScanCommand( executable, 
+                                                             gps, 
+                                                             exeConfig, 
+                                                             frmdir, 
+                                                             this_outdir 
+                                                           )
+            if opts.verbose:
+                print "%s 1> %s 2> %s"%(" ".join(cmd), stdout, stderr)
+            if persist: ### submit directly through subprocess and track proc
+                proc = fork.fork( cmd, stdout=stdout, stderr=stderr )
+                procs.append( (chanset, start, end, proc) )
+
+                ### report link to GraceDB for this chanset
+                ### because persist is True, we know that upload_or_verbose must also be True
+                message = "OmegaScan process over %s within [%.3f, %.3f] started. Output can be found <a href=\"%s\">here</a>."%(chanset, start, end, this_outurl)
+                if opts.verbose:
+                    print message
+                if opts.upload:
+                    gdb.writeLog( opts.graceid, message=message, tagname=tagname )
+
+            else: ### (double) fork and forget about proc
+                fork.safe_fork( cmd, stdout=stdout, stderr=stderr)
+    
+                ### report link to GraceDB for this chanset
+                if upload_or_verbose:
+                    message = "OmegaScan process over %s within [%.3f, %.3f] started. Output can be found <a href=\"%s\">here</a>. WARNING: will not track processes to ensure completion"%(chanset, start, end, this_outurl)
+                    if opts.verbose:
+                        print message
+                    if opts.upload:
+                        gdb.writeLog( opts.graceid, message=message, tagname=tagname )
+
+#-------------------------------------------------
+# WAIT FOR COMMANDS TO FINISH, CLEAN UP
+#-------------------------------------------------
 
 if persist: ### wait around for all the processes to finish
     if opts.verbose:

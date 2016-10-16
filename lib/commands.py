@@ -1,4 +1,5 @@
 description = "a module that builds command lines for OmegaScan processes"
+author      = "reed.essick@ligo.org"
 
 #-------------------------------------------------
 

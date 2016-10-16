@@ -1,4 +1,5 @@
 description = "a module that forks subprocesses in a safe manner that does not leave zombie proc's"
+author      = "reed.essick@ligo.org"
 
 #-------------------------------------------------
 

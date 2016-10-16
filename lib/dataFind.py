@@ -1,4 +1,5 @@
 description = "a module that handles data discovery"
+author      = "reed.essick@ligo.org"
 
 #-------------------------------------------------
 
