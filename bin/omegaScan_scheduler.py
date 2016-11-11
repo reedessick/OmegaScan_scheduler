@@ -402,7 +402,7 @@ if persist: ### wait around for all the processes to finish
             
 ### report to GraceDB that we've finished follow-up
 if upload_or_verbose:
-    message = "automatic OmegaScans finished."
+    message = "automatic OmegaScans finished for: %s."%(", ".join(chansets))
     if condor or (not persist):
         message = message + " WARNING: not tracking actual OmegaScan processes and data may not be available immediately."
     if opts.verbose:
