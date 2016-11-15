@@ -41,8 +41,8 @@ then
 	if [ -n "${recipients}" ]
 	then
             echo "sending email to ${recipients}"
-#	        echo "echo \"cron monitor on ${HOSTNAME} restarted lvalert_listen running under $(whoami) with resource=${resource} and eonfig=${config} at $(date) -> GPS=$(lalapps_tconvert now).\" | mailx -s \"lvalert_listen restarted on ${HOSTNAME}\" \"${recipients}\""
-	        echo "cron monitor on ${HOSTNAME} restarted lvalert_listen running under $(whoami) with resource=${resource} and eonfig=${config} at $(date) -> GPS=$(lalapps_tconvert now)." | mailx -s "lvalert_listen restarted on ${HOSTNAME}" "${recipients}"
+#	        echo "echo \"cron monitor on ${HOSTNAME} restarted lvalert_listen running under $(whoami) with resource=${resource} and config=${config} at $(date) -> GPS=$(lalapps_tconvert now).\" | mailx -s \"lvalert_listen restarted on ${HOSTNAME}\" \"${recipients}\""
+	        echo "cron monitor on ${HOSTNAME} restarted lvalert_listen running under $(whoami) with resource=${resource} and config=${config} at $(date) -> GPS=$(lalapps_tconvert now)." | mailx -s "lvalert_listen restarted on ${HOSTNAME}" "${recipients}"
 	fi
 else ### process does exist
 	echo "process exists"
