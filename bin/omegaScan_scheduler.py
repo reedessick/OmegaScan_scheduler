@@ -259,9 +259,10 @@ for chanset in chansets:
         ### copy frames locally
         if coverage < 1: ### could not find enough coverage after timing out
             if upload_or_verbose:
-                message = "could not find complete coverage for %s!\n%s"%(chanset, "\n".join(frames))
+                message = "could not find complete coverage for %s!"%(chanset)
                 if opts.verbose:
                     print message
+                    print "\n".join(frames)
                 if opts.upload:
                     gdb.writeLog( opts.graceid, message=message, tagname=tagname )
 
