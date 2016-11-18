@@ -17,6 +17,8 @@ import dataFind
 import fork
 import commands
 
+import math
+
 import time
 from lal.gpstime import tconvert
 
@@ -179,10 +181,10 @@ for chanset in chansets:
         assert config.has_section(frame_type), '%s has no section for frameType=%s'%(config_name, frame_type)
 
     ### figure out when to processes
-    stride = max([ float(chan['searchTimeRange']) for chan in chans ]) ### ensure we grab enough data based on what the scan wants!
-    win    = 0.5*stride
-    start  = gps-win
-    end    = gps+win
+    win    = 0.5*max([ float(chan['searchTimeRange']) for chan in chans ]) ### ensure we grab enough data based on what the scan wants!
+    start  = math.floor((gps-win)
+    end    = math.ceil(gps+win)
+    stride = end - start
 
     ### wait until we have a chance of finding data (causality)
     wait = end - tconvert('now')
