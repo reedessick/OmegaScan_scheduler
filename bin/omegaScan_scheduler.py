@@ -180,7 +180,7 @@ for chanset in chansets:
         assert config.has_section(frame_type), '%s has no section for frameType=%s'%(config_name, frame_type)
 
     ### figure out when to processes
-    win    = config.getfloat(chanset, 'win')
+    win    = max([ float(chan['searchTimeRange']) for chan in chans ])/2.0 ### ensure we grab enough data based on what the scan wants!
     start  = gps-win
     end    = gps+win
     stride = 2*win
