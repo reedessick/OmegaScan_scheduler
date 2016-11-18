@@ -73,7 +73,6 @@ executable  = config.get('general', 'executable')
 chansets = config.get('general', 'chansets').split()
 for chanset in chansets: ### ensure we have all the sections we need
     assert config.has_section(chanset), '%s has no section corresponding to chanset=%s'%(config_name, chanset)
-chansets.sort(key=lambda chanset: config.getfloat(chanset, 'win')) ### extract windows for each chanset and order them accordingly
 
 ### whether to use condor
 condor  = config.getboolean('general', 'condor')
@@ -180,10 +179,10 @@ for chanset in chansets:
         assert config.has_section(frame_type), '%s has no section for frameType=%s'%(config_name, frame_type)
 
     ### figure out when to processes
-    win    = max([ float(chan['searchTimeRange']) for chan in chans ])/2.0 ### ensure we grab enough data based on what the scan wants!
+    stride = max([ float(chan['searchTimeRange']) for chan in chans ]) ### ensure we grab enough data based on what the scan wants!
+    win    = 0.5*stride
     start  = gps-win
     end    = gps+win
-    stride = 2*win
 
     ### wait until we have a chance of finding data (causality)
     wait = end - tconvert('now')
