@@ -182,7 +182,7 @@ for chanset in chansets:
 
     ### figure out when to processes
     win    = 0.5*max([ float(chan['searchTimeRange']) for chan in chans ]) ### ensure we grab enough data based on what the scan wants!
-    start  = math.floor((gps-win)
+    start  = math.floor(gps-win)
     end    = math.ceil(gps+win)
     stride = end - start
 
