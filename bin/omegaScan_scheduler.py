@@ -225,6 +225,7 @@ for chanset in chansets:
                                                )
             coverage = dataFind.coverage(frames, start, stride)
             while (coverage < 1) and (tconvert('now')<timeout): ### still not enough coverage and we haven't timed out
+                time.sleep( 0.1 )### a sleep statement so we don't bomb the ldr server?
                 frames   = dataFind.ldr_find_frames( ldr_server, 
                                                      ldr_url_type, 
                                                      frame_type, 
@@ -246,6 +247,7 @@ for chanset in chansets:
                                                )
             coverage = dataFind.coverage(frames, start, stride)
             while (coverage < 1) and (tconvert('now')<timeout):
+                time.sleep( 0.1 )### sleep statement so we don't bomb the filesystem?
                 frames   = dataFind.shm_find_frames( shm_dir, 
                                                      ifo, 
                                                      frame_type, 
