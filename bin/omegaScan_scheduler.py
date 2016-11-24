@@ -257,6 +257,27 @@ for chanset in chansets:
                                                    )
                 coverage = dataFind.coverage(frames, start, stride)
 
+        elif lookup == 'arx':
+            arx_dir = config.get(frame_type, 'arx-dir')
+            frames  = dataFind.arx_find_frames( arx_dir,
+                                                ifo,
+                                                frame_type,
+                                                start,
+                                                stride,
+                                                verbose=opts.Verbose
+                                              )
+            coverage = dataFind.coverage(frames, start, stride)
+            while (coverage < 1) and (tconvert('now')<timeout):
+                time.sleep( 0.1 )### sleep statement so we don't bomb the filesystem?
+                frames   = dataFind.arx_find_frames( arx_dir,
+                                                     ifo,
+                                                     frame_type,
+                                                     start,
+                                                     stride,
+                                                     verbose=opts.Verbose
+                                                   )
+                coverage = dataFind.coverage(frames, start, stride)
+
         else:
             raise ValueError( 'lookup=%s not recognized!'%(lookup) )
 

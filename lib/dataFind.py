@@ -3,6 +3,7 @@ author      = "reed.essick@ligo.org"
 
 #-------------------------------------------------
 
+import os
 import glob
 import subprocess as sp
 
@@ -33,16 +34,56 @@ def shm_find_frames(directory, ifo, ldr_type, start, stride, verbose=False):
     """
     searches for frames in directory assuming standard naming conventions.
     Does this by hand rather than relying on ldr tools
+
+    specifically looks for the directory structure expected in /dev/shm buffers
     """
     end = start+stride
 
+    globstring = "%s/%s1/%s-%s-*-*.gwf"%(directory, ifo, ifo, ldr_type)
+    if verbose:
+        print 'glob : '+globstring
+
     frames = []
     for frame, (s, d) in [ (frame, extract_start_dur(frame, suffix=".gwf")) for frame in \
-                             sorted(glob.glob("%s/%s1/%s-%s-*-*.gwf"%(directory, ifo, ifo, ldr_type))) ]:
+                             sorted(glob.glob(globstring)) ]:
         if (s <= end) and (s+d >= start): ### there is some overlap!
             frames.append( frame )
 
     return frames
+
+def arx_find_frames(directory, ifo, ldr_type, start, stride, verbose=False):
+    """
+    searches for frames in directory assuming standard naming convetions.
+    Does this by hand rather than relying on ldr tools
+
+    specifically looks for the directory structure expected in /archive/frames/ directories
+    """
+    end = start+stride
+
+    startInt = int( start/1e5 ) ### needed for directory structure
+    endInt   = int( end/1e5 )
+
+    globstring = '%s/%s1/%s-%s-*'%(directory, ifo, ifo, ldr_type)
+    if verbose:
+        print 'glob : '+globstring
+
+    frames = []
+    for subdir in sorted(glob.glob(globstring)): ### walk through directories
+        subInt = int( os.path.basename(subdir).split('-')[-1] )
+
+        if (startInt <= subInt) and (subInt <= endInt): ### filter out only the interesting directories
+            globstring = "%s/%s-%s-*-*.gwf"%(subdir, ifo, ldr_type)
+            if verbose:
+                print 'glob : '+globstring
+
+            ### walk through files in this subdir
+            for frame, (s, d) in [ (frame, extract_start_dur(frame, suffix=".gwf")) for frame in \
+                             sorted(glob.glob(globstring)) ]:
+                if (s <= end) and (s+d >= start): ### there is some overlap!
+                    frames.append( frame )
+
+    return frames
+
 
 #-------------------------------------------------
 
