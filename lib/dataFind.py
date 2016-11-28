@@ -114,3 +114,41 @@ def coverage(frames, start, stride):
                 break
 
     return 1 - covered/stride ### return fraction of coverage
+
+def gaps(frames, start, stride):
+    """
+    returns a list of gaps in coverage between [start, start+stride]
+
+    assumes non-overlapping frames!
+    """
+    ### generate segments from frame names
+    segs = [extract_start_dur(frame) for frame in sorted(frames)]
+
+    if segs: ### non-empty list
+        gaps = []
+        end = segs[0][0]
+
+        if start < end: ### gap at the beginning
+            gaps.append( [start, end] ) 
+
+        for s, d in segs: ### check for gaps in the middle
+            if s+d < start: ### too early; we don't care
+                end = s+d 
+
+            elif s > start+stride: ### too late, we don't care
+                break
+
+            elif s==end: ### no gap
+                end += d
+
+            else: ### there is a gap
+                gaps.append( [end, s] )
+                end = s+d
+
+        if end < start+stride: ### gap at the end
+            gaps.append( [end, start+stride] )                
+
+    else: ### segs is empty
+        gaps = [ [start, start+stride] ]
+
+    return gaps

@@ -284,9 +284,11 @@ for chanset in chansets:
         ### copy frames locally
         if coverage < 1: ### could not find enough coverage after timing out
             if upload_or_verbose:
-                message = "could not find complete coverage for %s!"%(chanset)
+                gaps = dataFind.gaps( frames, start, stride ) ### find the gaps
+                message = "could not find complete coverage for %s! missing data within: %s"%(chanset, ", ".join( "%.0f - %.0f"%(s,e) for s, e in gaps ) )
                 if opts.verbose:
                     print message
+                    print "found : "
                     print "\n".join(frames)
                 if opts.upload:
                     gdb.writeLog( opts.graceid, message=message, tagname=tagname )
