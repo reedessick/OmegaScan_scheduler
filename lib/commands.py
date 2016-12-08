@@ -12,20 +12,20 @@ def gps2str( gps ):
 
 #-------------------------------------------------
 
-def omegaScanCommand( exe, gps, exeConfig, frameDir, outdir ):
+def omegaScanCommand( exe, gps, exeConfig, frameDir, outdir, colormap='parula' ):
     """
     returns cmd, stdout, stderr
         cmd    : a list of strings compatible with subprocess.Popen
         stdout : path to stdout (written in outdir)
         stderr : path to stderr (written in outdir)
     """
-    cmd = [exe, 'scan', gps2str(gps), '-c', exeConfig, '-f', frameDir, '-o', outdir, '-r']
+    cmd = [exe, 'scan', gps2str(gps), '-c', exeConfig, '-f', frameDir, '-o', outdir, '-r', '-m', colormap]
     stdout = "%s/%d.out"%(outdir, gps)
     stderr = "%s/%d.err"%(outdir, gps)
 
     return cmd, stdout, stderr
 
-def condorOmegaScanCommand( exe, gps, exeConfig, frameDir, outdir, accounting_group, accounting_group_user, universe='vanilla', retry=0 ):
+def condorOmegaScanCommand( exe, gps, exeConfig, frameDir, outdir, accounting_group, accounting_group_user, universe='vanilla', retry=0, colormap='parula' ):
     """
     returns cmd, stdout, stderr
         cmd    : a list of strings compatible with subprocess.Popen
@@ -38,7 +38,7 @@ def condorOmegaScanCommand( exe, gps, exeConfig, frameDir, outdir, accounting_gr
     sub_obj = open(sub, 'w')
     sub_obj.write( '''universe = %(universe)s
 executable = %(exe)s
-arguments = "scan %(gpsStr)s -c %(exeConfig)s -f %(frameDir)s -o %(outdir)s -r"
+arguments = "scan %(gpsStr)s -c %(exeConfig)s -f %(frameDir)s -o %(outdir)s -r -m %(colormap)s"
 getenv = true
 accounting_group = %(accounting_group)s
 accounting_group_user = %(accounting_group_user)s
@@ -53,6 +53,7 @@ queue 1'''%{'universe':universe,
             'exeConfig':exeConfig,
             'frameDir':frameDir,
             'outdir':outdir,
+            'colormap':colormap,
             'accounting_group':accounting_group,
             'accounting_group_user':accounting_group_user,
            } 

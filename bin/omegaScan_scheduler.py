@@ -92,6 +92,9 @@ persist = config.getboolean('general', 'persist') \
 ### FAR threshold to downselect events from GraceDB
 farThr  = config.getfloat('general', 'farThr')
 
+### get color map, default is 'parula'
+colormap = config.get('general', 'colormap') if config.has_option('general', 'colormap') else 'parula'
+
 #-------------------------------------------------
 
 ### set up robot cert
@@ -349,11 +352,12 @@ for chanset in chansets:
                                                                    gps, 
                                                                    exeConfig, 
                                                                    frmdir, 
-                                                                   this_outdir, 
+                                                                   this_outdir,
                                                                    accounting_group, 
                                                                    accounting_group_user,
                                                                    universe=universe,
                                                                    retry=retry,
+                                                                   colormap=colormap,
                                                                  )
             if opts.verbose:
                 print "%s 1> %s 2> %s"%(" ".join(cmd), stdout, stderr)
@@ -373,7 +377,8 @@ for chanset in chansets:
                                                              gps, 
                                                              exeConfig, 
                                                              frmdir, 
-                                                             this_outdir 
+                                                             this_outdir,
+                                                             colormap=colormap, 
                                                            )
             if opts.verbose:
                 print "%s 1> %s 2> %s"%(" ".join(cmd), stdout, stderr)
